@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>URDF 3D Builder - Ignition Gazebo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Courier New',monospace;background:#0a0c10;color:#c8d0e0;overflow:hidden;height:100vh}
+.app{display:flex;height:100vh;position:relative}
+.lp{width:185px;min-width:185px;background:#0f1117;border-right:1px solid #1e2330;display:flex;flex-direction:column;z-index:10;overflow:hidden}
+.panel-head{padding:8px 12px 6px;font-size:9px;letter-spacing:.12em;color:#4a5568;border-bottom:1px solid #1e2330;text-transform:uppercase}
+.tab-row{display:flex;border-bottom:1px solid #1e2330}
+.tab{flex:1;padding:5px 0;text-align:center;font-size:9px;letter-spacing:.08em;cursor:pointer;color:#4a5568;border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase}
+.tab.active{color:#60a5fa;border-bottom-color:#3b82f6}
+.palette{padding:6px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;flex:1}
+.pitem{padding:6px 8px;border:1px solid #1e2330;border-radius:5px;cursor:grab;font-size:10px;font-weight:bold;display:flex;align-items:center;gap:7px;transition:all .15s;user-select:none;color:#8fa0b8}
+.pitem:hover{border-color:#3b82f6;background:#111827;color:#93c5fd}
+.pitem:active{cursor:grabbing}
+.pico{width:16px;height:16px;border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px}
+.ic-base{background:#10b981;color:#fff}.ic-link{background:#3b82f6;color:#fff}.ic-joint{background:#f97316;color:#fff}
+.ic-lidar{background:#8b5cf6;color:#fff}.ic-camera{background:#ec4899;color:#fff}.ic-imu{background:#14b8a6;color:#fff}
+.ic-gps{background:#f59e0b;color:#fff}.ic-sonar{background:#06b6d4;color:#fff}
+.tree-section{flex:1;overflow-y:auto;border-top:1px solid #1e2330;padding:6px}
+.ts-head{font-size:9px;letter-spacing:.1em;color:#4a5568;margin-bottom:4px;text-transform:uppercase}
+.tnode{padding:3px 6px;border-radius:4px;font-size:10px;cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:1px;transition:background .1s;color:#8fa0b8}
+.tnode:hover{background:#1a1f2e}.tnode.sel{background:#1e3a5f;color:#60a5fa}
+.tdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.tbadge{font-size:8px;padding:1px 4px;border-radius:3px;margin-left:auto;white-space:nowrap}
+.tb-base{background:#064e3b;color:#6ee7b7}.tb-link{background:#1e3a5f;color:#60a5fa}
+.tb-joint{background:#431407;color:#fdba74}.tb-sensor{background:#2e1065;color:#c4b5fd}
+.viewport{flex:1;position:relative;background:#080a0f;overflow:hidden}
+#three-canvas{display:block;width:100%;height:100%}
+.vp-toolbar{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:3px;z-index:10;max-height:calc(100% - 30px);overflow-y:auto;overflow-x:hidden;padding-bottom:2px}
+.vtbtn{padding:4px 9px;border:1px solid #1e2330;border-radius:5px;font-size:10px;font-weight:bold;cursor:pointer;background:#0f1117;color:#8fa0b8;transition:all .15s;font-family:'Courier New',monospace;letter-spacing:.04em}
+.vtbtn:hover{border-color:#3b82f6;color:#60a5fa;background:#111827}
+.vtbtn.accent{background:#1e3a5f;color:#60a5fa;border-color:#2563eb}
+.vtbtn.accent:hover{background:#1d4ed8;color:#fff}
+.vtbtn.green{background:#064e3b;color:#6ee7b7;border-color:#059669}
+.vtbtn.green:hover{background:#065f46}
+.vtbtn:disabled{opacity:.32;cursor:not-allowed;pointer-events:none}
+.vtbtn.purple{background:#2e1065;color:#c4b5fd;border-color:#7c3aed}
+.vtbtn.purple:hover{background:#4c1d95}
+.conn-hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:#451a03;color:#fdba74;border:1px solid #92400e;border-radius:6px;padding:4px 14px;font-size:10px;z-index:20;font-family:'Courier New',monospace;display:none}
+.vp-hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-size:10px;color:#4a5568;pointer-events:none;white-space:nowrap;letter-spacing:.03em}
+.vp-axes{position:absolute;bottom:10px;left:10px;font-size:9px;color:#4a5568;letter-spacing:.04em;background:rgba(0,0,0,0.5);padding:4px 6px;border-radius:4px;}
+.sensor-gizmo{position:absolute;pointer-events:none}
+.rp{width:220px;min-width:220px;background:#0f1117;border-left:1px solid #1e2330;display:flex;flex-direction:column;z-index:10;overflow:hidden}
+.rp-head{padding:8px 12px 6px;font-size:9px;letter-spacing:.12em;color:#4a5568;border-bottom:1px solid #1e2330;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between}
+.del-btn{background:none;border:1px solid #1e2330;border-radius:4px;padding:2px 6px;font-size:8px;color:#4a5568;cursor:pointer;font-family:'Courier New',monospace;transition:all .15s;display:none}
+.del-btn:hover{background:#7f1d1d;color:#fca5a5;border-color:#991b1b}
+#dup-btn:hover{background:#064e3b!important;color:#6ee7b7!important;border-color:#059669!important}
+.rp-body{flex:1;overflow-y:auto;padding:8px}
+.empty-rp{font-size:10px;color:#4a5568;text-align:center;padding:20px 6px;line-height:1.9}
+.fg{margin-bottom:8px}
+.fl{font-size:9px;color:#4a5568;margin-bottom:2px;letter-spacing:.06em;text-transform:uppercase}
+.fi{width:100%;padding:4px 6px;border:1px solid #1e2330;border-radius:4px;font-size:10px;background:#080a0f;color:#c8d0e0;outline:none;font-family:'Courier New',monospace;transition:border-color .15s}
+.fi:focus{border-color:#3b82f6}
+.fi-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px}
+.fi-row .fi{text-align:center;padding:3px 2px}
+.fi-row2{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+select.fi{cursor:pointer}
+.color-preview{width:100%;height:18px;border-radius:3px;margin-top:3px;border:1px solid #1e2330}
+.sec-divider{font-size:9px;color:#3b82f6;letter-spacing:.1em;text-transform:uppercase;margin:10px 0 6px;padding-bottom:3px;border-bottom:1px solid #1e2330}
+.modal-bg{position:absolute;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:100}
+.modal{background:#0f1117;border:1px solid #2563eb;border-radius:10px;padding:16px;width:600px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column}
+.modal-title{font-size:11px;font-weight:bold;color:#60a5fa;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;letter-spacing:.06em}
+.modal-tabs{display:flex;gap:4px;margin-bottom:8px}
+.mtab{padding:3px 10px;border:1px solid #1e2330;border-radius:4px;font-size:9px;cursor:pointer;color:#8fa0b8;font-family:'Courier New',monospace;transition:all .15s}
+.mtab.active{background:#1e3a5f;color:#60a5fa;border-color:#2563eb}
+.modal-code{flex:1;overflow-y:auto;font-family:'Courier New',monospace;font-size:10px;background:#080a0f;border-radius:5px;padding:10px;white-space:pre;line-height:1.7;max-height:500px;border:1px solid #1e2330;color:#a3e635}
+.modal-code .c-gray{color:#4a5568}.modal-code .c-tag{color:#60a5fa}.modal-code .c-attr{color:#c4b5fd}.modal-code .c-val{color:#a3e635}.modal-code .c-comment{color:#374151}
+.modal-actions{margin-top:8px;display:flex;gap:5px;justify-content:flex-end}
+.xbtn{background:none;border:1px solid #1e2330;border-radius:4px;padding:4px 9px;font-size:10px;color:#8fa0b8;cursor:pointer;font-family:'Courier New',monospace;transition:all .15s}
+.xbtn:hover{border-color:#3b82f6;color:#60a5fa}
+.xbtn.p{background:#1e3a5f;color:#60a5fa;border-color:#2563eb}
+.xbtn.p:hover{background:#1d4ed8;color:#fff}
+.bash-block{background:#080a0f;border:1px solid #1e2330;border-radius:5px;padding:8px;font-size:9px;color:#a3e635;margin-bottom:8px;line-height:1.8;white-space:pre}
+.bash-label{font-size:9px;color:#4a5568;margin-bottom:3px;letter-spacing:.06em;text-transform:uppercase}
+.orient-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;margin-top:3px}
+.obtn{padding:3px 2px;border:1px solid #1e2330;border-radius:3px;font-size:8px;font-weight:bold;cursor:pointer;background:#0a0c10;color:#8fa0b8;font-family:'Courier New',monospace;transition:all .12s;text-align:center;letter-spacing:.02em}
+.obtn:hover{border-color:#60a5fa;color:#93c5fd;background:#111827}
+.rpy-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px}
+.rpy-sub{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-top:1px}
+.rpy-lbl{font-size:8px;color:#4a5568;text-align:center;margin-top:1px;letter-spacing:.04em}
+</style>
+</head>
+<body>
+
+<div class="app">
+<div class="lp">
+  <div class="panel-head">Components</div>
+  <div class="tab-row">
+    <div class="tab active" id="tab-struct" onclick="switchTab('struct')">Links</div>
+    <div class="tab" id="tab-sensor" onclick="switchTab('sensor')">Sensors</div>
+  </div>
+  <div class="palette" id="palette-struct">
+    <div class="pitem" draggable="true" data-type="base" ondragstart="palDrag(event)"><div class="pico ic-base">B</div>Base Link</div>
+    <div class="pitem" draggable="true" data-type="link" ondragstart="palDrag(event)"><div class="pico ic-link">L</div>Link</div>
+    <div class="pitem" draggable="true" data-type="joint" ondragstart="palDrag(event)"><div class="pico ic-joint">J</div>Joint</div>
+  </div>
+  <div class="palette" id="palette-sensor" style="display:none">
+    <div class="pitem" draggable="true" data-type="lidar" ondragstart="palDrag(event)"><div class="pico ic-lidar">L</div>LiDAR</div>
+    <div class="pitem" draggable="true" data-type="camera" ondragstart="palDrag(event)"><div class="pico ic-camera">C</div>Camera</div>
+    <div class="pitem" draggable="true" data-type="imu" ondragstart="palDrag(event)"><div class="pico ic-imu">I</div>IMU</div>
+    <div class="pitem" draggable="true" data-type="gps" ondragstart="palDrag(event)"><div class="pico ic-gps">G</div>GPS / NavSat</div>
+    <div class="pitem" draggable="true" data-type="sonar" ondragstart="palDrag(event)"><div class="pico ic-sonar">S</div>Sonar</div>
+  </div>
+
+  <div class="tree-section">
+    <div class="ts-head">Robot Tree</div>
+    <div id="tree-list"></div>
+  </div>
+</div>
+
+<div class="viewport" id="viewport" ondragover="event.preventDefault()" ondrop="vpDrop(event)">
+  <canvas id="three-canvas"></canvas>
+  <div class="vp-toolbar">
+    <button class="vtbtn" onclick="startJointMode()">+ Joint Connect</button>
+    <button class="vtbtn" id="anim-btn" onclick="toggleAnimation()" title="Preview Joint Motion">▶ Animate</button>
+    <button class="vtbtn" id="undo-btn" onclick="undo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
+    <button class="vtbtn" id="redo-btn" onclick="redo()" disabled title="Redo (Ctrl+Y)">↪ Redo</button>
+    <button class="vtbtn" onclick="resetCamera()">Reset Cam</button>
+    <button class="vtbtn" onclick="toggleGrid()">Toggle Grid</button>
+    <button class="vtbtn" onclick="clearAll()">Clear All</button>
+    <button class="vtbtn" onclick="saveRobot()" title="Save robot as JSON">💾 Save State</button>
+    <button class="vtbtn" onclick="loadRobot()" title="Load robot from JSON">📂 Load State</button>
+    <button class="vtbtn purple" onclick="showExport()">Export URDF</button>
+  </div>
+  <div class="conn-hint" id="conn-hint">Click parent link → then child link</div>
+  <div class="vp-hint" id="vp-hint">Drag from left panel onto 3D scene (Z is Up) · Orbit: drag · Zoom: scroll</div>
+  <div class="vp-axes">X (Fwd) <span style="color:#ef4444">●</span> Y (Lat) <span style="color:#22c55e">●</span> Z (Up) <span style="color:#3b82f6">●</span></div>
+</div>
+
+<div class="rp">
+  <div class="rp-head">
+    <span>Inspector</span>
+    <div style="display:flex;gap:4px">
+      <button class="del-btn" id="dup-btn" onclick="duplicateSelected()" style="display:none;color:#6ee7b7;border-color:#065f46">DUP</button>
+      <button class="del-btn" id="del-btn" onclick="deleteSelected()">DELETE</button>
+    </div>
+  </div>
+  <div class="rp-body" id="rp-body">
+    <div class="empty-rp">Select a node in the 3D scene or tree panel to edit properties</div>
+  </div>
+</div>
+</div>
+
+<div class="modal-bg" id="export-modal" onclick="if(event.target===this)closeExport()">
+  <div class="modal">
+    <div class="modal-title">
+      <span>Export — Ignition Gazebo Fortress</span>
+      <button style="background:none;border:none;cursor:pointer;color:#4a5568;font-size:13px" onclick="closeExport()">✕</button>
+    </div>
+    <div class="modal-tabs">
+      <div class="mtab active" onclick="switchExportTab('urdf',this)">robot.urdf</div>
+      <div class="mtab" onclick="switchExportTab('launch',this)">launch.py</div>
+      <div class="mtab" onclick="switchExportTab('setup',this)">Mesa / GPU</div>
+    </div>
+    <pre class="modal-code" id="export-code"></pre>
+    <div class="modal-actions">
+      <button class="xbtn" onclick="copyExport()">Copy</button>
+      <button class="xbtn p" onclick="downloadExport()">Download</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ── ALIGN THREE.JS NATIVELY TO ROS (Z-Up) ─────────────────────────────────
+THREE.Object3D.DefaultUp.set(0, 0, 1);
+
+// ── SENSOR DEFINITIONS ────────────────────────────────────────────────────
+const SENSOR_DEFS = {
+  lidar:{label:'LiDAR',color:0x8b5cf6,emissive:0x2e1065,size:[0.05,0.05,0.04],shape:'cylinder', // size = [radius, y(ignored), length(z)]
+    fields:{topic:'scan',samples:'360',min_angle:'-3.14159',max_angle:'3.14159',min_range:'0.15',max_range:'10.0',resolution:'0.01',noise_mean:'0',noise_stddev:'0.01',update_rate:'10',visualize:'true'},
+    plugin:'ignition::gazebo::systems::Sensors', sensorType:'gpu_lidar',headless:true},
+  camera:{label:'Camera',color:0xec4899,emissive:0x500724,size:[0.02,0.05,0.02],shape:'box',
+    fields:{topic:'camera/image_raw',width:'640',height:'480',fov:'1.047',near_clip:'0.1',far_clip:'100',format:'R8G8B8',update_rate:'30',visualize:'true'},
+    plugin:'ignition::gazebo::systems::Sensors', sensorType:'camera',headless:false},
+  imu:{label:'IMU',color:0x14b8a6,emissive:0x042f2e,size:[0.04,0.04,0.02],shape:'box',
+    fields:{topic:'imu/data',update_rate:'100',noise_accel:'0.004',noise_gyro:'0.02'},
+    plugin:'ignition::gazebo::systems::Imu', sensorType:'imu',headless:false},
+  gps:{label:'GPS',color:0xf59e0b,emissive:0x451a03,size:[0.05,0.05,0.015],shape:'box',
+    fields:{topic:'gps/fix',update_rate:'1.0',position_sensing:'true',velocity_sensing:'true'},
+    plugin:'ignition::gazebo::systems::NavSat', sensorType:'navsat',headless:false},
+  sonar:{label:'Sonar',color:0x06b6d4,emissive:0x083344,size:[0.03,0.03,0.04],shape:'cylinder',
+    fields:{topic:'sonar',min_range:'0.02',max_range:'2.0',field_of_view:'0.1',update_rate:'20'},
+    plugin:'ignition::gazebo::systems::Sensors', sensorType:'sonar',headless:false},
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+const S={nodes:[],selected:null,nextId:1,jointMode:false,jointFirst:null,gridOn:true};
+let isAnimating = false;
+let animTime = 0;
+
+// ── UNDO / REDO ───────────────────────────────────────────────────────────
+const _history=[];
+let _histIdx=-1;
+const MAX_HIST=60;
+
+function snapshotState(){
+  return JSON.stringify({nodes:S.nodes.map(n=>({...n,mesh:undefined,_mat:undefined,_animMat:undefined})),nextId:S.nextId,selected:S.selected});
+}
+function pushHistory(){
+  if(_histIdx<_history.length-1)_history.splice(_histIdx+1);
+  _history.push(snapshotState());
+  if(_history.length>MAX_HIST)_history.shift();
+  _histIdx=_history.length-1;
+  updateUndoRedoBtns();
+}
+function restoreSnapshot(snap){
+  const saved=JSON.parse(snap);
+  for(const n of S.nodes)if(n.mesh)scene.remove(n.mesh);
+  S.nodes=saved.nodes;
+  S.nextId=saved.nextId;
+  S.selected=saved.selected;
+  for(const n of S.nodes)buildMesh(n);
+  highlightSelected();
+  updateJointLines();
+  updateSensorViz();
+  renderTree();
+  if(S.selected){const n=S.nodes.find(x=>x.id===S.selected);if(n)renderInspector(n);}else renderInspEmpty();
+  updateHint();
+  updateUndoRedoBtns();
+}
+function undo(){if(_histIdx<=0)return;_histIdx--;restoreSnapshot(_history[_histIdx]);}
+function redo(){if(_histIdx>=_history.length-1)return;_histIdx++;restoreSnapshot(_history[_histIdx]);}
+function updateUndoRedoBtns(){
+  const uBtn=document.getElementById('undo-btn'), rBtn=document.getElementById('redo-btn');
+  if(uBtn)uBtn.disabled=_histIdx<=0;
+  if(rBtn)rBtn.disabled=_histIdx>=_history.length-1;
+}
+
+// ── THREE SETUP ───────────────────────────────────────────────────────────
+const canvas=document.getElementById('three-canvas');
+const vp=document.getElementById('viewport');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x080a0f,1);
+const scene=new THREE.Scene();
+
+const camera=new THREE.PerspectiveCamera(50,1,0.01,100);
+camera.position.set(2.1, 1.3, 1.6);
+camera.up.set(0,0,1);
+
+const ambient=new THREE.AmbientLight(0x334466,1.2); scene.add(ambient);
+const dirL=new THREE.DirectionalLight(0x8ab4ff,1.0); dirL.position.set(3,3,5); dirL.castShadow=true; scene.add(dirL);
+const rimL=new THREE.DirectionalLight(0xf97316,0.3); rimL.position.set(-3,-2,-1); scene.add(rimL);
+
+const grid=new THREE.GridHelper(4,20,0x1e2330,0x141820);
+grid.rotation.x = Math.PI / 2; // Orient to XY plane
+scene.add(grid);
+
+// Ground plane is XY by default
+const groundM=new THREE.Mesh(new THREE.PlaneGeometry(10,10),new THREE.MeshStandardMaterial({color:0x080c14,roughness:1}));
+groundM.receiveShadow=true; scene.add(groundM);
+scene.add(new THREE.AxesHelper(0.35));
+
+const jLines=new THREE.Group(); scene.add(jLines);
+const sensorViz=new THREE.Group(); scene.add(sensorViz);
+
+function resize(){const W=vp.clientWidth,H=vp.clientHeight;renderer.setSize(W,H,false);camera.aspect=W/H;camera.updateProjectionMatrix();}
+resize(); window.addEventListener('resize',resize);
+
+// Orbit (Z-up Math)
+let orb={theta: 0.6, phi: 1.1, r: 2.7, target:new THREE.Vector3(0,0,0.1)};
+let oDrag=null;
+canvas.addEventListener('mousedown',e=>{if(e.button===2)return;oDrag={x:e.clientX,y:e.clientY,theta:orb.theta,phi:orb.phi};});
+canvas.addEventListener('mousemove',e=>{
+  if(!oDrag)return;
+  const dx=(e.clientX-oDrag.x)*.008, dy=(e.clientY-oDrag.y)*.008;
+  orb.theta = oDrag.theta - dx;
+  orb.phi = Math.max(.05, Math.min(Math.PI/2 - .05, oDrag.phi - dy)); // restrict above ground
+  updateCam();
+});
+canvas.addEventListener('mouseup',e=>{if(oDrag&&Math.abs(e.clientX-oDrag.x)<4&&Math.abs(e.clientY-oDrag.y)<4)handleClick(e);oDrag=null;});
+canvas.addEventListener('wheel',e=>{orb.r=Math.max(.4,Math.min(12,orb.r+e.deltaY*.005));updateCam();},{passive:true});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+
+function updateCam(){
+  camera.position.set(
+    orb.target.x + orb.r * Math.sin(orb.phi) * Math.cos(orb.theta),
+    orb.target.y + orb.r * Math.sin(orb.phi) * Math.sin(orb.theta),
+    orb.target.z + orb.r * Math.cos(orb.phi)
+  );
+  camera.lookAt(orb.target);
+}
+function resetCamera(){orb={theta:0.6,phi:1.1,r:2.7,target:new THREE.Vector3(0,0,0.1)};updateCam();}
+updateCam();
+
+const raycaster=new THREE.Raycaster();
+function handleClick(e){
+  if(S.jointMode){handleJointModeClick(e);return;}
+  const rect=canvas.getBoundingClientRect();
+  const mx=((e.clientX-rect.left)/rect.width)*2-1,my=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera({x:mx,y:my},camera);
+  const hits=raycaster.intersectObjects(S.nodes.map(n=>n.mesh).filter(Boolean),true);
+  if(hits.length){let o=hits[0].object;while(o.parent&&!o.userData.nodeId)o=o.parent;if(o.userData.nodeId){selectNode(o.userData.nodeId);return;}}
+  selectNode(null);
+}
+function handleJointModeClick(e){
+  const rect=canvas.getBoundingClientRect();
+  const mx=((e.clientX-rect.left)/rect.width)*2-1,my=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera({x:mx,y:my},camera);
+  const linkMeshes=S.nodes.filter(n=>n.type==='base'||n.type==='link').map(n=>n.mesh).filter(Boolean);
+  const hits=raycaster.intersectObjects(linkMeshes,true);
+  if(hits.length){let o=hits[0].object;while(o.parent&&!o.userData.nodeId)o=o.parent;if(o.userData.nodeId)handleJointClick(o.userData.nodeId);}
+}
+
+// Helper to get visual position (handles animation offsets)
+const getPos = n => n.mesh ? n.mesh.position : new THREE.Vector3(n.x||0, n.y||0, n.z||0);
+const getQuat = n => n.mesh ? n.mesh.quaternion : new THREE.Quaternion().setFromEuler(new THREE.Euler(n.rx||0, n.ry||0, n.rz||0, 'XYZ'));
+
+// ── COLORS ────────────────────────────────────────────────────────────────
+const C_FILL={base:0x10b981,link:0x3b82f6,joint:0xf97316,lidar:0x8b5cf6,camera:0xec4899,imu:0x14b8a6,gps:0xf59e0b,sonar:0x06b6d4};
+const C_EMIS={base:0x065f46,link:0x1e3a5f,joint:0x431407,lidar:0x2e1065,camera:0x500724,imu:0x042f2e,gps:0x451a03,sonar:0x083344};
+const C_SEL={base:0x34d399,link:0x60a5fa,joint:0xfb923c,lidar:0xc4b5fd,camera:0xf9a8d4,imu:0x5eead4,gps:0xfcd34d,sonar:0x67e8f9};
+
+function getNodeCategory(type){
+  if(['base','link'].includes(type))return'link';
+  if(type==='joint')return'joint';
+  return'sensor';
+}
+
+function buildMesh(n){
+  let geo;
+  const def=SENSOR_DEFS[n.type];
+  if(n.type==='joint'){geo=new THREE.OctahedronGeometry(0.04,0);}
+  else if(def){
+    const sz=def.size; // sz = [x, y, z] natively now
+    if(def.shape==='cylinder'){
+      geo=new THREE.CylinderGeometry(sz[0],sz[0],sz[2],20);
+      geo.rotateX(Math.PI/2); // Align cylinder to Z-axis natively
+    } else {
+      geo=new THREE.BoxGeometry(sz[0],sz[1],sz[2]);
+    }
+  } else {
+    const g=n.geometry||{shape:'box',sx:'.15',sy:'.15',sz:'.1'};
+    const sx=parseFloat(g.sx)||.15, sy=parseFloat(g.sy)||.15, sz=parseFloat(g.sz)||.1;
+    if(g.shape==='cylinder'){
+      geo=new THREE.CylinderGeometry(sx,sx,sz,20);
+      geo.rotateX(Math.PI/2); // Align cylinder to Z-axis
+    }
+    else if(g.shape==='sphere')geo=new THREE.SphereGeometry(sx,20,16);
+    else geo=new THREE.BoxGeometry(sx,sy,sz); // Direct 1:1 mapping!
+  }
+  const mat=new THREE.MeshStandardMaterial({color:C_FILL[n.type]||0x3b82f6,emissive:C_EMIS[n.type]||0x1e3a5f,emissiveIntensity:.3,roughness:.35,metalness:.55});
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.castShadow=true; mesh.userData.nodeId=n.id;
+  const wire=new THREE.Mesh(geo.clone(),new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,transparent:true,opacity:.04}));
+  wire.userData.nodeId=n.id;
+  const grp=new THREE.Group(); grp.add(mesh); grp.add(wire);
+  grp.position.set(n.x||0,n.y||0,n.z||0);
+  grp.rotation.set(n.rx||0,n.ry||0,n.rz||0);
+  grp.userData.nodeId=n.id; scene.add(grp);
+  n.mesh=grp; n._mat=mat;
+  updateSensorViz();
+}
+
+function rebuildMesh(n){if(n.mesh){scene.remove(n.mesh);n.mesh=null;}buildMesh(n);highlightSelected();updateJointLines();}
+
+function updateSensorViz(){
+  while(sensorViz.children.length)sensorViz.remove(sensorViz.children[0]);
+  for(const n of S.nodes){
+    const pos = getPos(n);
+    if(n.type==='lidar'){
+      // LiDAR ring in XY plane
+      const pts=[];for(let i=0;i<=64;i++){const a=(i/64)*Math.PI*2;pts.push(new THREE.Vector3(Math.cos(a)*.6,Math.sin(a)*.6,0));}
+      const geo=new THREE.BufferGeometry().setFromPoints(pts);
+      const ring=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0x8b5cf6,transparent:true,opacity:.3}));
+      ring.position.copy(pos); ring.position.z += 0.02; // elevate slightly
+      ring.quaternion.copy(getQuat(n));
+      sensorViz.add(ring);
+      // scan lines
+      for(let i=0;i<8;i++){const a=(i/8)*Math.PI*2;const sg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(Math.cos(a)*.6,Math.sin(a)*.6,0)]);const sl=new THREE.Line(sg,new THREE.LineBasicMaterial({color:0x8b5cf6,transparent:true,opacity:.15}));sl.position.copy(pos); sl.position.z += 0.02; sl.quaternion.copy(getQuat(n)); sensorViz.add(sl);}
+    } else if(n.type==='camera'){
+      // FOV frustum pointing along +X
+      const d=.3, w=.15, h=w*0.75;
+      const pts=[new THREE.Vector3(0,0,0),new THREE.Vector3(d,-w,h),new THREE.Vector3(0,0,0),new THREE.Vector3(d,w,h),new THREE.Vector3(0,0,0),new THREE.Vector3(d,-w,-h),new THREE.Vector3(0,0,0),new THREE.Vector3(d,w,-h),d,-w,h, d,w,h, d,-w,-h, d,w,-h].filter(v=>v instanceof THREE.Vector3);
+      const rect=[new THREE.Vector3(d,-w,h),new THREE.Vector3(d,w,h),new THREE.Vector3(d,w,-h),new THREE.Vector3(d,-w,-h),new THREE.Vector3(d,-w,h)];
+      const g1=new THREE.BufferGeometry().setFromPoints(pts);
+      const g2=new THREE.BufferGeometry().setFromPoints(rect);
+      const mat=new THREE.LineBasicMaterial({color:0xec4899,transparent:true,opacity:.35});
+      const l1=new THREE.LineSegments(g1,mat); l1.position.copy(pos); l1.quaternion.copy(getQuat(n)); sensorViz.add(l1);
+      const l2=new THREE.Line(g2,mat); l2.position.copy(pos); l2.quaternion.copy(getQuat(n)); sensorViz.add(l2);
+    }
+  }
+}
+
+function updateJointLines(){
+  while(jLines.children.length)jLines.remove(jLines.children[0]);
+  for(const jn of S.nodes.filter(n=>n.type==='joint')){
+    const p=S.nodes.find(x=>x.id===jn.parent), c=S.nodes.find(x=>x.id===jn.child);
+    if(!p||!c)continue;
+    const pts=[getPos(p).clone(), getPos(jn).clone(), getPos(c).clone()];
+    const g=new THREE.BufferGeometry().setFromPoints(pts);
+    jLines.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0xf97316,transparent:true,opacity:.5})));
+  }
+  for(const n of S.nodes.filter(n=>['lidar','camera','imu','gps','sonar'].includes(n.type))){
+    if(!n.attachedTo)continue;
+    const parent=S.nodes.find(x=>x.id===n.attachedTo);
+    if(!parent)continue;
+    const pts=[getPos(parent).clone(), getPos(n).clone()];
+    const g=new THREE.BufferGeometry().setFromPoints(pts);
+    const colMap={lidar:0x8b5cf6,camera:0xec4899,imu:0x14b8a6,gps:0xf59e0b,sonar:0x06b6d4};
+    jLines.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:colMap[n.type]||0xffffff,transparent:true,opacity:.4,dashSize:.03,gapSize:.02})));
+  }
+}
+
+function highlightSelected(){
+  for(const n of S.nodes){
+    if(!n._mat)continue;
+    if(n.id===S.selected){n._mat.emissive.setHex(C_SEL[n.type]||0x60a5fa);n._mat.emissiveIntensity=.7;}
+    else{n._mat.emissive.setHex(C_EMIS[n.type]||0x1e3a5f);n._mat.emissiveIntensity=.3;}
+  }
+}
+
+// ── ADD NODE ──────────────────────────────────────────────────────────────
+function addNode(type,x,y,z){
+  const id='n'+(S.nextId++);
+  const def=SENSOR_DEFS[type];
+  const name=`${type}_${id}`;
+  const n={id,type,name,x,y,z,
+    rx:0,ry:0,rz:0,
+    geometry:{shape:'box',sx:'.15',sy:'.15',sz:'.1'},
+    mass:'0.5',inertia:{ixx:'.001',iyy:'.001',izz:'.001'},
+    material:{r:'.5',g:'.5',b:'.5',a:'1.0'},
+    jointType:'revolute',parent:null,child:null,
+    origin:{xyz:'0 0 0',rpy:'0 0 0'},axis:{x:'0',y:'0',z:'1'},
+    limits:{lower:'-1.57',upper:'1.57',effort:'10',velocity:'1.0'},
+    attachedTo:null,
+    sensorParams: def ? Object.assign({},def.fields) : null,
+  };
+  if(type==='base'){ n.name='base_link'; n.geometry={shape:'box',sx:'.5',sy:'.3',sz:'.1'}; n.z=0.1; }
+  S.nodes.push(n); buildMesh(n); selectNode(id); renderTree(); updateHint(); pushHistory();
+}
+
+function deleteSelected(){
+  if(!S.selected)return;
+  const id=S.selected;
+  const n=S.nodes.find(x=>x.id===id);
+  if(n&&n.mesh)scene.remove(n.mesh);
+  S.nodes=S.nodes.filter(x=>x.id!==id);
+  S.nodes=S.nodes.filter(x=>!(x.type==='joint'&&(x.parent===id||x.child===id)));
+  S.selected=null;
+  updateJointLines(); updateSensorViz(); renderTree(); renderInspEmpty(); updateHint(); pushHistory();
+}
+
+function duplicateSelected(){
+  const src=getSel();if(!src)return;
+  const id='n'+(S.nextId++);
+  const copy=JSON.parse(JSON.stringify({...src,mesh:undefined,_mat:undefined}));
+  copy.id=id; copy.name=src.name+'_copy';
+  copy.x=(src.x||0)+0.15; copy.y=(src.y||0)+0.15;
+  if(copy.type==='joint'){copy.parent=null;copy.child=null;}
+  S.nodes.push(copy);buildMesh(copy);selectNode(id);renderTree();updateJointLines();pushHistory();
+}
+
+function saveRobot(){
+  const data={nodes:S.nodes.map(n=>({...n,mesh:undefined,_mat:undefined})),nextId:S.nextId};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='robot.json';a.click();
+}
+
+function loadRobot(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
+  inp.onchange=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const data=JSON.parse(ev.target.result);
+        for(const n of S.nodes)if(n.mesh)scene.remove(n.mesh);
+        S.nodes=data.nodes||[]; S.nextId=data.nextId||1; S.selected=null;
+        for(const n of S.nodes){n.rx=n.rx||0;n.ry=n.ry||0;n.rz=n.rz||0;buildMesh(n);}
+        highlightSelected();updateJointLines();updateSensorViz();renderTree();renderInspEmpty();updateHint();pushHistory();
+      }catch(err){alert('Invalid robot JSON file');}
+    };reader.readAsText(f);
+  };inp.click();
+}
+
+function clearAll(){
+  for(const n of S.nodes)if(n.mesh)scene.remove(n.mesh);
+  S.nodes=[]; S.selected=null; isAnimating=false;
+  const animBtn = document.getElementById('anim-btn');
+  if(animBtn) { animBtn.textContent = '▶ Animate'; animBtn.classList.remove('purple'); }
+  updateJointLines(); updateSensorViz(); renderTree(); renderInspEmpty(); updateHint(); pushHistory();
+}
+
+// ── DRAG DROP ─────────────────────────────────────────────────────────────
+let _dragType=null;
+function palDrag(e){_dragType=e.currentTarget.dataset.type;}
+function vpDrop(e){
+  e.preventDefault(); if(!_dragType)return;
+  const rect=vp.getBoundingClientRect();
+  const mx=((e.clientX-rect.left)/rect.width)*2-1,my=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera({x:mx,y:my},camera);
+  const plane=new THREE.Plane(new THREE.Vector3(0,0,1),0); // XY plane
+  const pt=new THREE.Vector3(); raycaster.ray.intersectPlane(plane,pt);
+  const x=Math.round(pt.x*10)/10, y=Math.round(pt.y*10)/10;
+  const def=SENSOR_DEFS[_dragType];
+  const zOff=def?(def.size[2]||.05)/2+.02:(_dragType==='joint'?.1:.05);
+  addNode(_dragType,x,y,zOff); _dragType=null;
+}
+
+// ── JOINT MODE ────────────────────────────────────────────────────────────
+function startJointMode(){S.jointMode=true;S.jointFirst=null;document.getElementById('conn-hint').style.display='';document.getElementById('conn-hint').textContent='Click parent (base/link)…';}
+function cancelJointMode(){S.jointMode=false;S.jointFirst=null;document.getElementById('conn-hint').style.display='none';}
+function handleJointClick(id){
+  if(!S.jointFirst){S.jointFirst=id;document.getElementById('conn-hint').textContent='Now click child link…';}
+  else{
+    if(S.jointFirst===id){cancelJointMode();return;}
+    const p=S.nodes.find(x=>x.id===S.jointFirst),c=S.nodes.find(x=>x.id===id);
+    const jx=(p.x+c.x)/2,jy=(p.y+c.y)/2,jz=(p.z+c.z)/2;
+    const jid='n'+(S.nextId++),jname='joint_'+jid;
+    const jn={id:jid,type:'joint',name:jname,x:jx,y:jy,z:jz,
+      rx:0,ry:0,rz:0,
+      jointType:'revolute',parent:S.jointFirst,child:id,
+      origin:{xyz:'0 0 0',rpy:'0 0 0'},axis:{x:'0',y:'0',z:'1'},
+      limits:{lower:'-1.57',upper:'1.57',effort:'10',velocity:'1.0'}};
+    S.nodes.push(jn); buildMesh(jn); cancelJointMode(); selectNode(jid); updateJointLines(); renderTree(); pushHistory();
+  }
+}
+
+// ── SELECTION ─────────────────────────────────────────────────────────────
+function selectNode(id){S.selected=id;highlightSelected();renderTree();if(!id){renderInspEmpty();return;}const n=S.nodes.find(x=>x.id===id);if(n)renderInspector(n);}
+function renderInspEmpty(){
+  document.getElementById('rp-body').innerHTML='<div class="empty-rp">Select a node in the 3D scene or tree panel to edit properties</div>';
+  document.getElementById('del-btn').style.display='none';
+  document.getElementById('dup-btn').style.display='none';
+}
+
+// ── INSPECTOR ─────────────────────────────────────────────────────────────
+function deg(r){return ((r||0)*180/Math.PI);}
+function orientHtml(n){
+  const rx=deg(n.rx).toFixed(1), ry=deg(n.ry).toFixed(1), rz=deg(n.rz).toFixed(1);
+  const presets=[
+    ['Default',0,0,0],  ['Flip Y',0,180,0],  ['Flip X',180,0,0],
+    ['+Y fwd',0,0,90],  ['-Y fwd',0,0,-90],  ['+Z fwd',0,-90,0],
+    ['Wheel Y',-90,0,0],['Wheel X',0,-90,0], ['Tilt 45',0,45,0],
+  ];
+  return `<div class="sec-divider">Orientation</div>
+<div class="fg">
+  <div class="fl">Rotation R/P/Y (degrees)</div>
+  <div class="rpy-row">
+    <input class="fi" id="rot-rx" value="${rx}" oninput="updRot('rx',this.value)" style="text-align:center" ${isAnimating?'disabled':''}>
+    <input class="fi" id="rot-ry" value="${ry}" oninput="updRot('ry',this.value)" style="text-align:center" ${isAnimating?'disabled':''}>
+    <input class="fi" id="rot-rz" value="${rz}" oninput="updRot('rz',this.value)" style="text-align:center" ${isAnimating?'disabled':''}>
+  </div>
+  <div class="rpy-sub"><span class="rpy-lbl">Roll(X)</span><span class="rpy-lbl">Pitch(Y)</span><span class="rpy-lbl">Yaw(Z)</span></div>
+</div>
+<div class="fg">
+  <div class="fl">Quick Orient</div>
+  <div class="orient-grid">
+    ${presets.map(([lbl,rx,ry,rz])=>`<button class="obtn" onclick="applyOrient(${rx},${ry},${rz})" ${isAnimating?'disabled':''}>${lbl}</button>`).join('')}
+  </div>
+</div>`;
+}
+
+function renderInspector(n){
+  document.getElementById('del-btn').style.display='';
+  document.getElementById('dup-btn').style.display='';
+  const rb=document.getElementById('rp-body');
+  const posHtml=`<div class="fg"><div class="fl">World Position (X/Y/Z)</div><div class="fi-row"><input class="fi" value="${(n.x||0).toFixed(3)}" oninput="updPos('x',this.value)" ${isAnimating?'disabled':''}><input class="fi" value="${(n.y||0).toFixed(3)}" oninput="updPos('y',this.value)" ${isAnimating?'disabled':''}><input class="fi" value="${(n.z||0).toFixed(3)}" oninput="updPos('z',this.value)" ${isAnimating?'disabled':''}></div></div>`;
+  const def=SENSOR_DEFS[n.type];
+
+  if(def){
+    const cat=getNodeCategory(n.type);
+    const linkOptions=S.nodes.filter(x=>x.type==='base'||x.type==='link').map(x=>`<option value="${x.id}" ${n.attachedTo===x.id?'selected':''}>${x.name}</option>`).join('');
+    let paramHtml='';
+    for(const [k,v] of Object.entries(n.sensorParams||{})){
+      paramHtml+=`<div class="fg"><div class="fl">${k.replace(/_/g,' ')}</div><input class="fi" value="${v}" oninput="updSensorParam('${k}',this.value)"></div>`;
+    }
+    rb.innerHTML=`
+<div class="fg"><div class="fl">Name</div><input class="fi" value="${n.name}" oninput="updF('name',this.value)"></div>
+<div class="fg"><div class="fl">Attached to Link</div>
+<select class="fi" onchange="updF('attachedTo',this.value);updateJointLines()">
+<option value="">— none —</option>${linkOptions}
+</select></div>
+${posHtml}
+${orientHtml(n)}
+<div class="sec-divider">${cat} params</div>
+${paramHtml}`;
+  } else if(n.type==='joint'){
+    const linkOpts=S.nodes.filter(x=>x.type!=='joint'&&x.id!==n.id).map(x=>`<option value="${x.id}" ${n.parent===x.id||n.child===x.id?'selected':''} data-which="${n.parent===x.id?'p':'c'}">${x.name}</option>`).join('');
+    const p=S.nodes.find(x=>x.id===n.parent),c=S.nodes.find(x=>x.id===n.child);
+    const computedXYZ = (p&&c) ? `${((c.x||0)-(p.x||0)).toFixed(4)} ${((c.y||0)-(p.y||0)).toFixed(4)} ${((c.z||0)-(p.z||0)).toFixed(4)}` : '0 0 0';
+    const displayXYZ = (n.origin.xyz.trim()==='0 0 0') ? computedXYZ : n.origin.xyz;
+    rb.innerHTML=`
+<div class="fg"><div class="fl">Name</div><input class="fi" value="${n.name}" oninput="updF('name',this.value)"></div>
+<div class="fg"><div class="fl">Joint Type</div>
+<select class="fi" onchange="updF('jointType',this.value)">
+${['revolute','continuous','prismatic','fixed','floating','planar'].map(t=>`<option ${n.jointType===t?'selected':''}>${t}</option>`).join('')}
+</select></div>
+<div class="fg"><div class="fl">Parent Link</div>
+<select class="fi" onchange="updF('parent',this.value)"><option value="">— none —</option>
+${S.nodes.filter(x=>x.type!=='joint'&&x.id!==n.id).map(x=>`<option value="${x.id}" ${n.parent===x.id?'selected':''}>${x.name}</option>`).join('')}
+</select></div>
+<div class="fg"><div class="fl">Child Link</div>
+<select class="fi" onchange="updF('child',this.value)"><option value="">— none —</option>
+${S.nodes.filter(x=>x.type!=='joint'&&x.id!==n.id).map(x=>`<option value="${x.id}" ${n.child===x.id?'selected':''}>${x.name}</option>`).join('')}
+</select></div>
+${posHtml}
+${orientHtml(n)}
+<div class="fg"><div class="fl">Origin xyz <span style="color:#4a5568;font-size:8px">(relative to parent — edit to override auto)</span></div><input class="fi" value="${displayXYZ}" oninput="updN('origin','xyz',this.value)" placeholder="auto-computed"></div>
+<div class="fg"><div class="fl">Origin rpy</div><input class="fi" value="${n.origin.rpy}" oninput="updN('origin','rpy',this.value)"></div>
+<div class="fg"><div class="fl">Axis xyz</div><input class="fi" value="${n.axis.x} ${n.axis.y} ${n.axis.z}" oninput="updAxisStr(this.value)"></div>
+<div class="fg"><div class="fl">Limits lower/upper</div><div class="fi-row2"><input class="fi" value="${n.limits.lower}" oninput="updN('limits','lower',this.value)"><input class="fi" value="${n.limits.upper}" oninput="updN('limits','upper',this.value)"></div></div>
+<div class="fg"><div class="fl">Effort / Velocity</div><div class="fi-row2"><input class="fi" value="${n.limits.effort}" oninput="updN('limits','effort',this.value)"><input class="fi" value="${n.limits.velocity}" oninput="updN('limits','velocity',this.value)"></div></div>`;
+  } else {
+    const matR=parseFloat(n.material?.r||.5),matG=parseFloat(n.material?.g||.5),matB=parseFloat(n.material?.b||.5);
+    const hex='#'+[matR,matG,matB].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('');
+    rb.innerHTML=`
+<div class="fg"><div class="fl">Name</div><input class="fi" value="${n.name}" oninput="updF('name',this.value)"></div>
+<div class="fg"><div class="fl">Geometry</div>
+<select class="fi" onchange="updGeoShape(this.value)" style="margin-bottom:3px">
+${['box','cylinder','sphere'].map(s=>`<option ${n.geometry.shape===s?'selected':''}>${s}</option>`).join('')}
+</select>
+<div class="fi-row"><input class="fi" value="${n.geometry.sx}" placeholder="X size" oninput="updN('geometry','sx',this.value);rebuildMesh(getSel())"><input class="fi" value="${n.geometry.sy}" placeholder="Y size" oninput="updN('geometry','sy',this.value);rebuildMesh(getSel())"><input class="fi" value="${n.geometry.sz}" placeholder="Z size" oninput="updN('geometry','sz',this.value);rebuildMesh(getSel())"></div></div>
+${posHtml}
+${orientHtml(n)}
+<div class="fg"><div class="fl">Mass (kg)</div><input class="fi" value="${n.mass}" oninput="updF('mass',this.value)"></div>
+<div class="fg"><div class="fl">Inertia ixx/iyy/izz</div><div class="fi-row"><input class="fi" value="${n.inertia.ixx}" oninput="updN('inertia','ixx',this.value)"><input class="fi" value="${n.inertia.iyy}" oninput="updN('inertia','iyy',this.value)"><input class="fi" value="${n.inertia.izz}" oninput="updN('inertia','izz',this.value)"></div></div>
+<div class="fg"><div class="fl">Material RGBA</div><div class="fi-row"><input class="fi" value="${n.material.r}" oninput="updN('material','r',this.value);updMatCol()"><input class="fi" value="${n.material.g}" oninput="updN('material','g',this.value);updMatCol()"><input class="fi" value="${n.material.b}" oninput="updN('material','b',this.value);updMatCol()"></div><div class="color-preview" id="colprev" style="background:${hex}"></div></div>`;
+  }
+}
+
+// ── FIELD UPDATES ─────────────────────────────────────────────────────────
+let _histDebounce=null;
+function debouncePush(){clearTimeout(_histDebounce);_histDebounce=setTimeout(pushHistory,600);}
+function getSel(){return S.nodes.find(x=>x.id===S.selected);}
+function updF(k,v){const n=getSel();if(!n)return;n[k]=v;if(k==='name')renderTree();updateJointLines();debouncePush();}
+function updN(k,s,v){const n=getSel();if(n&&n[k]){n[k][s]=v;debouncePush();}}
+function updPos(ax,v){
+  const n=getSel();if(!n)return;
+  n[ax]=parseFloat(v)||0;
+  if(n.mesh && !isAnimating) n.mesh.position[ax]=n[ax];
+  updateJointLines();updateSensorViz();debouncePush();
+}
+function updRot(ax,v){
+  const n=getSel();if(!n)return;
+  const rad=(parseFloat(v)||0)*Math.PI/180;
+  n[ax]=rad;
+  const axis=ax.slice(1);
+  if(n.mesh && !isAnimating) n.mesh.rotation[axis]=rad;
+  updateSensorViz();debouncePush();
+}
+function applyOrient(rx,ry,rz){
+  const n=getSel();if(!n)return;
+  n.rx=rx*Math.PI/180; n.ry=ry*Math.PI/180; n.rz=rz*Math.PI/180;
+  if(n.mesh && !isAnimating) n.mesh.rotation.set(n.rx,n.ry,n.rz);
+  updateSensorViz(); renderInspector(n); pushHistory();
+}
+function updGeoShape(v){const n=getSel();if(!n)return;n.geometry.shape=v;rebuildMesh(n);renderInspector(n);pushHistory();}
+function updAxisStr(v){const parts=v.trim().split(/\s+/);const n=getSel();if(!n)return;n.axis.x=parts[0]||'0';n.axis.y=parts[1]||'0';n.axis.z=parts[2]||'1';debouncePush();}
+function updMatCol(){const n=getSel();if(!n)return;const r=parseFloat(n.material.r),g=parseFloat(n.material.g),b=parseFloat(n.material.b);const hex='#'+[r,g,b].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('');const el=document.getElementById('colprev');if(el)el.style.background=hex;if(n._mat)n._mat.color.setRGB(r,g,b);debouncePush();}
+function updSensorParam(k,v){const n=getSel();if(!n||!n.sensorParams)return;n.sensorParams[k]=v;debouncePush();}
+
+function switchTab(t){
+  ['struct','sensor'].forEach(tab=>{
+    document.getElementById('tab-'+tab).classList.toggle('active',tab===t);
+    document.getElementById('palette-'+tab).style.display=tab===t?'flex':'none';
+  });
+}
+
+function renderTree(){
+  const el=document.getElementById('tree-list');el.innerHTML='';
+  const catColor={base:'#10b981',link:'#3b82f6',joint:'#f97316',lidar:'#8b5cf6',camera:'#ec4899',imu:'#14b8a6',gps:'#f59e0b',sonar:'#06b6d4'};
+  const cat=n=>['base','link'].includes(n.type)?'tb-link':n.type==='joint'?'tb-joint':'tb-sensor';
+  for(const n of S.nodes){
+    const d=document.createElement('div');d.className='tnode'+(S.selected===n.id?' sel':'');
+    d.innerHTML=`<span class="tdot" style="background:${catColor[n.type]||'#888'}"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n.name}</span><span class="tbadge ${cat(n)}">${n.type}</span>`;
+    d.onclick=()=>selectNode(n.id);el.appendChild(d);
+  }
+}
+
+function toggleGrid(){S.gridOn=!S.gridOn;grid.visible=S.gridOn;}
+function updateHint(){document.getElementById('vp-hint').style.display=S.nodes.length?'none':'';}
+
+// ── KINEMATICS & ANIMATION ──────────────────────────────────────────────────
+function toggleAnimation() {
+  isAnimating = !isAnimating;
+  const btn = document.getElementById('anim-btn');
+  if (btn) {
+    btn.textContent = isAnimating ? '■ Stop Anim' : '▶ Animate';
+    btn.classList.toggle('purple', isAnimating);
+  }
+  
+  if (!isAnimating) {
+    // Reset positions
+    for (const n of S.nodes) {
+      if (n.mesh) {
+        n.mesh.position.set(n.x||0, n.y||0, n.z||0);
+        n.mesh.rotation.set(n.rx||0, n.ry||0, n.rz||0);
+      }
+    }
+    updateJointLines();
+    updateSensorViz();
+    if(S.selected) renderInspector(getSel()); // Re-enable inputs
+  } else {
+    animTime = 0;
+    if(S.selected) renderInspector(getSel()); // Disable inputs
+  }
+}
+
+function applyKinematics() {
+  const childMap = {}; 
+  for (const n of S.nodes) if (n.type === 'joint' && n.child) childMap[n.child] = n;
+  const nMap = {}; 
+  for (const n of S.nodes) nMap[n.id] = n;
+
+  const getWMat = (id) => {
+    const n = nMap[id];
+    if (!n) return new THREE.Matrix4();
+    if (n._animMat) return n._animMat;
+
+    const j = childMap[id];
+    if (!j || !j.parent || !nMap[j.parent]) {
+      const m = new THREE.Matrix4();
+      m.makeRotationFromEuler(new THREE.Euler(n.rx||0, n.ry||0, n.rz||0, 'XYZ'));
+      m.setPosition(n.x||0, n.y||0, n.z||0);
+      n._animMat = m; return m;
+    }
+
+    const pMat = getWMat(j.parent);
+    const jMat = new THREE.Matrix4();
+    const pNode = nMap[j.parent];
+    
+    // Joint Origin Offset
+    let dx = (j.x||0)-(pNode.x||0), dy = (j.y||0)-(pNode.y||0), dz = (j.z||0)-(pNode.z||0);
+    if (j.origin.xyz.trim() !== '0 0 0') {
+      const pts = j.origin.xyz.split(' ');
+      dx = parseFloat(pts[0])||0; dy = parseFloat(pts[1])||0; dz = parseFloat(pts[2])||0;
+    }
+    jMat.setPosition(dx, dy, dz);
+
+    if (j.origin.rpy.trim() !== '0 0 0') {
+      const rpy = j.origin.rpy.split(' ');
+      jMat.makeRotationFromEuler(new THREE.Euler(parseFloat(rpy[0])||0, parseFloat(rpy[1])||0, parseFloat(rpy[2])||0, 'XYZ'));
+      jMat.setPosition(dx, dy, dz); // Re-apply position after rotation
+    }
+
+    // Joint Motion
+    const rMat = new THREE.Matrix4();
+    if (j.jointType === 'continuous' || j.jointType === 'revolute') {
+      const axis = new THREE.Vector3(parseFloat(j.axis.x)||0, parseFloat(j.axis.y)||0, parseFloat(j.axis.z)||1).normalize();
+      let ang = Math.sin(animTime * 4) * 0.8; 
+      if (j.jointType === 'continuous') ang = animTime * 4;
+      rMat.makeRotationAxis(axis, ang);
+    }
+
+    const childMat = new THREE.Matrix4();
+    childMat.multiplyMatrices(pMat, jMat);
+    childMat.multiply(rMat);
+
+    n._animMat = childMat;
+    return childMat;
+  };
+
+  for (const n of S.nodes) {
+    if (n.mesh && n.type !== 'joint') {
+      const m = getWMat(n.id);
+      m.decompose(n.mesh.position, n.mesh.quaternion, n.mesh.scale);
+    }
+  }
+  for (const n of S.nodes) n._animMat = null;
+
+  updateJointLines();
+  updateSensorViz();
+}
+
+// ── EXPORT (1:1 Native Z-Up Mappings) ─────────────────────────────────────
+let _exportTab='urdf', _exportContent='';
+
+function generateURDF(){
+  const links    = S.nodes.filter(n=>['base','link'].includes(n.type));
+  const joints   = S.nodes.filter(n=>n.type==='joint');
+  const sensors  = S.nodes.filter(n=>['lidar','camera','imu','gps','sonar'].includes(n.type));
+  const hasLidar = sensors.some(s=>s.type==='lidar');
+  const hasImu   = sensors.some(s=>s.type==='imu');
+  const hasGps   = sensors.some(s=>s.type==='gps');
+
+  const contJoints = joints.filter(j=>j.jointType==='continuous');
+  const hasDiff = contJoints.length >= 2;
+
+  const fmt4 = v => (parseFloat(v)||0).toFixed(4);
+  const fmt6 = v => (parseFloat(v)||0).toFixed(6);
+
+  // Native 1:1 Mapping because we operate in Z-up directly now!
+  const relXYZ = (child, parent) => `${fmt4((child.x||0)-(parent.x||0))} ${fmt4((child.y||0)-(parent.y||0))} ${fmt4((child.z||0)-(parent.z||0))}`;
+  const absXYZ = n => `${fmt4(n.x||0)} ${fmt4(n.y||0)} ${fmt4(n.z||0)}`;
+  const urdfRpy = n => `${fmt6(n.rx||0)} ${fmt6(n.ry||0)} ${fmt6(n.rz||0)}`;
+
+  const geoStr = g => {
+    if(g.shape==='cylinder') return `<cylinder radius="${g.sx}" length="${g.sz}"/>`;
+    if(g.shape==='sphere')   return `<sphere radius="${g.sx}"/>`;
+    return `<box size="${g.sx} ${g.sy} ${g.sz}"/>`;
+  };
+
+  const sGeoStr = def => {
+    const sz=def.size;
+    return def.shape==='cylinder' ? `<cylinder radius="${sz[0]}" length="${sz[2]}"/>` : `<box size="${sz[0]} ${sz[1]} ${sz[2]}"/>`;
+  };
+
+  const colHex = {lidar:'0 0 1 1', camera:'1 0 0 1', imu:'0 0.8 0.8 1', gps:'1 0.6 0 1', sonar:'0 0.8 0.8 1'};
+
+  let wheelSep = 0.35, wheelRad = 0.1;
+  if(hasDiff && contJoints.length >= 2){
+    const lj0 = contJoints[0], lj1 = contJoints[1];
+    const c0 = S.nodes.find(n=>n.id===lj0.child), c1 = S.nodes.find(n=>n.id===lj1.child);
+    if(c0 && c1){
+      const sep = Math.abs((c0.y||0)-(c1.y||0)); // Lateral is Y
+      if(sep > 0.001) wheelSep = parseFloat(sep.toFixed(4));
+      const g0 = c0.geometry;
+      if(g0 && g0.shape==='cylinder') wheelRad = parseFloat(g0.sx)||wheelRad;
+    }
+  }
+
+  const baseLink = links.find(l=>l.type==='base');
+  const baseName = baseLink ? baseLink.name : 'base_link';
+
+  let x = `<?xml version="1.0"?>\n\n<robot name="my_robot">\n\n`;
+
+  x += `  \n`;
+  x += `  <link name="base_footprint"/>\n\n`;
+  x += `  <joint name="base_joint" type="fixed">\n`;
+  x += `    <parent link="base_footprint"/>\n`;
+  x += `    <child link="${baseName}"/>\n`;
+  x += `    <origin xyz="0 0 ${baseLink ? baseLink.z.toFixed(4) : wheelRad.toFixed(4)}" rpy="0 0 0"/>\n`;
+  x += `  </joint>\n\n`;
+
+  x += `  \n  <gazebo>\n\n`;
+  x += `    <plugin filename="libignition-gazebo-joint-state-publisher-system.so"\n`;
+  x += `            name="ignition::gazebo::systems::JointStatePublisher"/>\n\n`;
+  x += `    <plugin filename="libignition-gazebo-sensors-system.so"\n`;
+  x += `            name="ignition::gazebo::systems::Sensors">\n`;
+  x += `      <render_engine>ogre</render_engine>\n`; // ogre instead of ogre2 for WSL/Fortress
+  x += `    </plugin>\n\n`;
+  
+  if(hasImu){
+    x += `    <plugin filename="libignition-gazebo-imu-system.so"\n            name="ignition::gazebo::systems::Imu"/>\n\n`;
+  }
+  if(hasGps){
+    x += `    <plugin filename="libignition-gazebo-navsat-system.so"\n            name="ignition::gazebo::systems::NavSat"/>\n\n`;
+  }
+  if(hasDiff){
+    let ljNode = contJoints[0], rjNode = contJoints[1];
+    const lc = S.nodes.find(n=>n.id===ljNode.child), rc = S.nodes.find(n=>n.id===rjNode.child);
+    if(lc && rc && (lc.y||0) < (rc.y||0)) [ljNode, rjNode]=[rjNode, ljNode];
+    x += `    <plugin filename="libignition-gazebo-diff-drive-system.so"\n`;
+    x += `            name="ignition::gazebo::systems::DiffDrive">\n`;
+    x += `      <left_joint>${ljNode.name}</left_joint>\n`;
+    x += `      <right_joint>${rjNode.name}</right_joint>\n`;
+    x += `      <wheel_separation>${wheelSep}</wheel_separation>\n`;
+    x += `      <wheel_radius>${wheelRad}</wheel_radius>\n`;
+    x += `      <topic>cmd_vel</topic>\n      <odom_topic>odom</odom_topic>\n`;
+    x += `      <frame_id>odom</frame_id>\n      <child_frame_id>base_footprint</child_frame_id>\n`;
+    x += `      <tf_topic>/tf</tf_topic>\n      <odom_publish_frequency>50</odom_publish_frequency>\n`;
+    x += `    </plugin>\n\n`;
+  }
+  x += `  </gazebo>\n\n`;
+
+  for(const lk of links){
+    const g = lk.geometry||{shape:'box',sx:.15,sy:.15,sz:.3};
+    const gs = geoStr(g);
+    const m  = lk.material||{r:.5,g:.5,b:.5,a:1};
+    x += `  <link name="${lk.name}">\n    <visual>\n`;
+    x += `      <origin xyz="0 0 0" rpy="0 0 0"/>\n`;
+    x += `      <geometry>${gs}</geometry>\n`;
+    x += `      <material name="${lk.name}_mat"><color rgba="${m.r} ${m.g} ${m.b} ${m.a||'1.0'}"/></material>\n`;
+    x += `    </visual>\n    <collision>\n`;
+    x += `      <origin xyz="0 0 0" rpy="0 0 0"/>\n      <geometry>${gs}</geometry>\n`;
+    x += `    </collision>\n    <inertial>\n`;
+    x += `      <mass value="${lk.mass||'1.0'}"/>\n`;
+    x += `      <inertia ixx="${lk.inertia.ixx}" ixy="0" ixz="0" iyy="${lk.inertia.iyy}" iyz="0" izz="${lk.inertia.izz}"/>\n`;
+    x += `    </inertial>\n  </link>\n\n`;
+  }
+
+  for(const jn of joints){
+    const p = S.nodes.find(n=>n.id===jn.parent), c = S.nodes.find(n=>n.id===jn.child);
+    if(!p||!c) continue;
+    const oXYZ = jn.origin.xyz.trim()!=='0 0 0' ? jn.origin.xyz : relXYZ(c, p);
+    const oRPY = (jn.origin.rpy && jn.origin.rpy.trim()!=='0 0 0') ? jn.origin.rpy : urdfRpy(c);
+
+    x += `  <joint name="${jn.name}" type="${jn.jointType}">\n`;
+    x += `    <parent link="${p.name}"/>\n    <child link="${c.name}"/>\n`;
+    x += `    <origin xyz="${oXYZ}" rpy="${oRPY}"/>\n`;
+    if(jn.jointType!=='fixed'&&jn.jointType!=='floating')
+      x += `    <axis xyz="${jn.axis.x} ${jn.axis.y} ${jn.axis.z}"/>\n`;
+    if(jn.jointType==='revolute'||jn.jointType==='prismatic')
+      x += `    <limit lower="${jn.limits.lower}" upper="${jn.limits.upper}" effort="${jn.limits.effort}" velocity="${jn.limits.velocity}"/>\n`;
+    x += `  </joint>\n\n`;
+  }
+
+  for(const s of sensors){
+    const def = SENSOR_DEFS[s.type]; if(!def) continue;
+    const parentNode = S.nodes.find(n=>n.id===s.attachedTo);
+    const parentName = parentNode ? parentNode.name : baseName;
+    const oXYZ = parentNode ? relXYZ(s, parentNode) : absXYZ(s);
+    const oRPY = urdfRpy(s);
+    const geo  = sGeoStr(def);
+    const col  = colHex[s.type]||'0.5 0.5 0.5 1';
+    const p2   = s.sensorParams||{};
+
+    x += `  \n`;
+    x += `  <link name="${s.name}_link">\n    <visual>\n`;
+    x += `      <origin xyz="0 0 0" rpy="0 0 0"/>\n`;
+    x += `      <geometry>${geo}</geometry>\n`;
+    x += `      <material name="${s.name}_mat"><color rgba="${col}"/></material>\n`;
+    x += `    </visual>\n    <collision>\n`;
+    x += `      <origin xyz="0 0 0" rpy="0 0 0"/>\n      <geometry>${geo}</geometry>\n`;
+    x += `    </collision>\n    <inertial>\n`;
+    x += `      <mass value="0.05"/>\n      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>\n`;
+    x += `    </inertial>\n  </link>\n\n`;
+
+    x += `  <joint name="${s.name}_joint" type="fixed">\n`;
+    x += `    <parent link="${parentName}"/>\n    <child link="${s.name}_link"/>\n`;
+    x += `    <origin xyz="${oXYZ}" rpy="${oRPY}"/>\n  </joint>\n\n`;
+
+    if(s.type==='camera'){
+      x += `  <link name="${s.name}_link_optical"/>\n\n`;
+      x += `  <joint name="${s.name}_optical_joint" type="fixed">\n`;
+      x += `    <parent link="${s.name}_link"/>\n    <child link="${s.name}_link_optical"/>\n`;
+      x += `    <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>\n  </joint>\n\n`;
+    }
+
+    x += `  <gazebo reference="${s.name}_link">\n`;
+    x += `    <sensor name="${s.name}" type="${def.sensorType}">\n`;
+    x += `      <pose relative_to="${s.name}_link">0 0 0 0 0 0</pose>\n`;
+    let sTopic = p2.topic || (s.type==='lidar'?'scan':s.type==='camera'?'camera/image_raw':s.type==='imu'?'imu/data':s.type==='gps'?'gps/fix':'sonar');
+    x += `      <topic>${sTopic}</topic>\n`;
+    x += `      <update_rate>${p2.update_rate||(s.type==='lidar'?10:s.type==='imu'?100:30)}</update_rate>\n`;
+    x += `      <always_on>true</always_on>\n`;
+    x += `      <visualize>${p2.visualize||(s.type==='camera'?'false':'true')}</visualize>\n`;
+
+    if(s.type==='lidar'){
+      x += `      <lidar>\n        <scan>\n          <horizontal>\n`;
+      x += `            <samples>${p2.samples||360}</samples>\n            <resolution>1</resolution>\n`;
+      x += `            <min_angle>${p2.min_angle||'-3.14159'}</min_angle>\n            <max_angle>${p2.max_angle||'3.14159'}</max_angle>\n`;
+      x += `          </horizontal>\n        </scan>\n        <range>\n`;
+      x += `          <min>${p2.min_range||0.15}</min>\n          <max>${p2.max_range||10.0}</max>\n          <resolution>${p2.resolution||0.01}</resolution>\n`;
+      x += `        </range>\n        <noise>\n          <type>gaussian</type>\n          <mean>${p2.noise_mean||0.0}</mean>\n          <stddev>${p2.noise_stddev||0.01}</stddev>\n        </noise>\n      </lidar>\n`;
+    } else if(s.type==='camera'){
+      const infoTopic = sTopic.replace('image_raw','').replace(/\/$/,'')+'camera_info';
+      x += `      <camera_info_topic>${infoTopic}</camera_info_topic>\n`;
+      x += `      <camera>\n        <horizontal_fov>${p2.fov||1.047}</horizontal_fov>\n`;
+      x += `        <image>\n          <width>${p2.width||640}</width>\n          <height>${p2.height||480}</height>\n          <format>${p2.format||'R8G8B8'}</format>\n        </image>\n`;
+      x += `        <clip>\n          <near>${p2.near_clip||0.05}</near>\n          <far>${p2.far_clip||100}</far>\n        </clip>\n`;
+      x += `        <noise><type>gaussian</type><mean>0.0</mean><stddev>0.007</stddev></noise>\n      </camera>\n`;
+    } else if(s.type==='imu'){
+      x += `      <imu>\n        <angular_velocity>\n          <x><noise type="gaussian"><mean>0</mean><stddev>${p2.noise_gyro||0.02}</stddev></noise></x>\n          <y><noise type="gaussian"><mean>0</mean><stddev>${p2.noise_gyro||0.02}</stddev></noise></y>\n          <z><noise type="gaussian"><mean>0</mean><stddev>${p2.noise_gyro||0.02}</stddev></noise></z>\n        </angular_velocity>\n        <linear_acceleration>\n          <x><noise type="gaussian"><mean>0</mean><stddev>${p2.noise_accel||0.004}</stddev></noise></x>\n          <y><noise type="gaussian"><mean>0</mean><stddev>${p2.noise_accel||0.004}</stddev></noise></y>\n          <z><noise type="gaussian"><mean>0</mean><stddev>${p2.noise_accel||0.004}</stddev></noise></z>\n        </linear_acceleration>\n      </imu>\n`;
+    } else if(s.type==='gps'){
+      x += `      <navsat>\n        <position_sensing>${p2.position_sensing||'true'}</position_sensing>\n        <velocity_sensing>${p2.velocity_sensing||'true'}</velocity_sensing>\n      </navsat>\n`;
+    } else if(s.type==='sonar'){
+      x += `      <sonar>\n        <min>${p2.min_range||0.02}</min>\n        <max>${p2.max_range||2.0}</max>\n        <field_of_view>${p2.field_of_view||0.1}</field_of_view>\n      </sonar>\n`;
+    }
+    x += `    </sensor>\n  </gazebo>\n\n`;
+  }
+  x += `</robot>\n`;
+  return x;
+}
+
+function generateLaunch(){
+  const hasLidar=S.nodes.some(n=>n.type==='lidar');
+  return `#!/usr/bin/env python3
+"""Launch file — Ignition Gazebo Fortress"""
+import os
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, SetEnvironmentVariable
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
+
+def generate_launch_description():
+    urdf_path = os.path.join(
+        get_package_share_directory('my_robot_pkg'),
+        'urdf', 'robot.urdf'
+    )
+    with open(urdf_path, 'r') as f:
+        robot_desc = f.read()
+
+    return LaunchDescription([
+        # ── Mesa / headless GPU for LiDAR ──
+        SetEnvironmentVariable('MESA_GL_VERSION_OVERRIDE', '3.3'),
+        SetEnvironmentVariable('LIBGL_ALWAYS_SOFTWARE', '1'),
+
+        Node(package='robot_state_publisher', executable='robot_state_publisher',
+             name='robot_state_publisher', output='screen', parameters=[{'robot_description': robot_desc}]),
+        ExecuteProcess(cmd=['ign', 'gazebo', '-r', 'empty.sdf'], output='screen'),
+        Node(package='ros_gz_sim', executable='create', arguments=['-name', 'my_robot', '-topic', 'robot_description'], output='screen'),
+        Node(package='ros_gz_bridge', executable='parameter_bridge',
+            arguments=[
+${S.nodes.filter(n=>n.sensorParams?.topic).map(n=>{
+  const t=n.sensorParams.topic;
+  if(n.type==='lidar')return `                '/${t}@sensor_msgs/msg/LaserScan[ignition.msgs.LaserScan',`;
+  if(n.type==='camera')return `                '/${t}@sensor_msgs/msg/Image[ignition.msgs.Image',\n                '/${t.replace('image_raw','')}/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo',`;
+  if(n.type==='imu')return `                '/${t}@sensor_msgs/msg/Imu[ignition.msgs.IMU',`;
+  if(n.type==='gps')return `                '/${t}@sensor_msgs/msg/NavSatFix[ignition.msgs.NavSat',`;
+  return `                '/${t}@sensor_msgs/msg/Range[ignition.msgs.SonarStamped',`;
+}).join('\n')}
+            ], output='screen'),
+        Node(package='joint_state_publisher', executable='joint_state_publisher', name='joint_state_publisher'),
+        Node(package='rviz2', executable='rviz2', name='rviz2', output='screen'),
+    ])
+`;
+}
+
+function generateMesaSetup(){
+  return `# ══════════════════════════════════════════════════════════════
+#  Mesa / Software GPU — Ignition Gazebo Fortress (WSL2)
+# ══════════════════════════════════════════════════════════════
+
+export MESA_GL_VERSION_OVERRIDE=3.3
+export LIBGL_ALWAYS_SOFTWARE=1
+
+# Then launch normally:
+ros2 launch my_robot_pkg robot.launch.py
+
+# Verify LiDAR data:
+ros2 topic echo /scan | head -30
+`;
+}
+
+function switchExportTab(t,el){
+  _exportTab=t;
+  document.querySelectorAll('.mtab').forEach(m=>m.classList.remove('active'));
+  el.classList.add('active');
+  if(t==='urdf') _exportContent=generateURDF();
+  else if(t==='launch') _exportContent=generateLaunch();
+  else _exportContent=generateMesaSetup();
+  document.getElementById('export-code').textContent=_exportContent;
+}
+
+function showExport(){
+  _exportContent=generateURDF(); _exportTab='urdf';
+  document.querySelectorAll('.mtab').forEach((m,i)=>m.classList.toggle('active',i===0));
+  document.getElementById('export-code').textContent=_exportContent;
+  document.getElementById('export-modal').style.display='flex';
+}
+function closeExport(){document.getElementById('export-modal').style.display='none';}
+function copyExport(){navigator.clipboard.writeText(_exportContent).catch(()=>{});const b=event.target;b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1500);}
+function downloadExport(){
+  const ext=_exportTab==='urdf'?'.urdf':_exportTab==='launch'?'.launch.py':'.sh';
+  const name=_exportTab==='urdf'?'robot':_exportTab==='launch'?'robot.launch':'mesa_setup';
+  const a=document.createElement('a');a.href='data:text/plain;charset=utf-8,'+encodeURIComponent(_exportContent);a.download=name+ext;a.click();
+}
+
+window.addEventListener('keydown',e=>{
+  if(e.key==='Escape')cancelJointMode();
+  if((e.key==='Delete'||e.key==='Backspace')&&S.selected){
+    const tag=document.activeElement?.tagName;
+    if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA')return;
+    deleteSelected();
+  }
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undo();}
+  if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.shiftKey&&e.key==='z'))){e.preventDefault();redo();}
+});
+
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);t+=.012;
+  const sel=S.nodes.find(x=>x.id===S.selected);
+  if(sel&&sel._mat)sel._mat.emissiveIntensity=.55+Math.sin(t*2)*.18;
+  
+  if(isAnimating){
+    animTime += 0.016;
+    applyKinematics();
+  }
+  
+  renderer.render(scene,camera);
+}
+animate();
+
+// Init with clean environment
+setTimeout(()=>{resize();},120);
+</script>
+</body>
+</html>
